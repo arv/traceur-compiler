@@ -576,6 +576,7 @@ System.set('@traceur/module', (function(global) {
     this.__proto__ = null;
     Object.preventExtensions(this);
   }
+  Module.prototype = null;
   System.get = function(name) {
     var m = getModuleImpl(name);
     if (!m) return undefined;

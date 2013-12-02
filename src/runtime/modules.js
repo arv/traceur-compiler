@@ -122,6 +122,8 @@ System.set('@traceur/module', (function(global) {
     this.__proto__ = null;
     Object.preventExtensions(this);
   }
+  Module.prototype = null;
+  // TODO(arv): Install Module as a global.
 
   System.get = function(name) {
     var m = getModuleImpl(name);
