@@ -40,8 +40,8 @@ export var optionsV01 = enumerableOnlyObject({
   freeVariableChecker: false,
   generatorComprehension: false,
   generators: true,
-  lowResolutionSourceMap: false,
   inputSourceMap: false,
+  lowResolutionSourceMap: false,
   memberVariables: false,
   moduleName: 'default',
   modules: 'register',
@@ -52,6 +52,7 @@ export var optionsV01 = enumerableOnlyObject({
   referrer: '',
   require: false,
   restParameters: true,
+  saneScript: false,
   script: false,
   sourceMaps: false,
   spread: true,
@@ -139,10 +140,11 @@ addFeatureOption('arrayComprehension', EXPERIMENTAL); // 11.4.1.2
 addFeatureOption('asyncFunctions', EXPERIMENTAL);
 addFeatureOption('exponentiation', EXPERIMENTAL);
 addFeatureOption('generatorComprehension', EXPERIMENTAL);
+addFeatureOption('memberVariables', EXPERIMENTAL);
 addFeatureOption('require', EXPERIMENTAL);
+addFeatureOption('saneScript', EXPERIMENTAL);
 addFeatureOption('symbols', EXPERIMENTAL);
 addFeatureOption('types', EXPERIMENTAL);
-addFeatureOption('memberVariables', EXPERIMENTAL);
 
 
 var transformOptionsPrototype = {};

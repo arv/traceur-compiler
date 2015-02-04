@@ -286,6 +286,11 @@ var Initializer = {
   REQUIRED: 'REQUIRED'
 };
 
+// Enums for language mode. Sane mode implies strict mode.
+const SLOPPY_MODE = 0;
+const STRICT_MODE = 1;
+const SANE_MODE = 2;
+
 /**
  * Used to find invalid CoverInitializedName trees. This is used when we know
  * the tree is not going to be used as a pattern.
@@ -370,12 +375,25 @@ export class Parser {
     // time this was read.
     this.coverInitializedNameCount_ = 0;
 
-    /**
-     * Keeps track of whether we are currently in strict mode parsing or not.
-     */
-    this.strictMode_ = false;
-
+    this.languageMode_ = SLOPPY_MODE;
     this.annotations_ = [];
+  }
+
+  /**
+   * Sets the language mode, ensuring that we can only make it stricter.
+   */
+  restrictLanguageMode_(mode) {
+    if (mode > this.languageMode_) {
+      this.languageMode_ = mode;
+    }
+  }
+
+  isStrictMode_() {
+    return this.languageMode_ >= STRICT_MODE;
+  }
+
+  isSaneMode_() {
+    return this.options_.saneScript && this.languageMode_ == SANE_MODE;
   }
 
   // 14 Script
@@ -383,7 +401,7 @@ export class Parser {
    * @return {Script}
    */
   parseScript() {
-    this.strictMode_ = false;
+    this.languageMode_ = SLOPPY_MODE;
     var start = this.getTreeStartLocation_();
     var scriptItemList = this.parseStatementList_(true);
     this.eat_(END_OF_FILE);
@@ -395,10 +413,11 @@ export class Parser {
   //   StatementList StatementListItem
 
   /**
+   * @param {boolean} checkDirective
    * @return {Array.<ParseTree>}
    * @private
    */
-  parseStatementList_(checkUseStrictDirective) {
+  parseStatementList_(checkDirective) {
     var result = [];
     var type;
 
@@ -406,12 +425,16 @@ export class Parser {
     // reasons.
     while ((type = this.peekType_()) !== CLOSE_CURLY && type !== END_OF_FILE) {
       var statement = this.parseStatementListItem_(type);
-      if (checkUseStrictDirective) {
+      if (checkDirective) {
         if (!statement.isDirectivePrologue()) {
-          checkUseStrictDirective = false;
+          checkDirective = false;
         } else if (statement.isUseStrictDirective()) {
-          this.strictMode_ = true;
-          checkUseStrictDirective = false;
+          this.restrictLanguageMode_(STRICT_MODE);
+          checkDirective = false;
+        } else if (this.options_.saneScript &&
+                   statement.isUseSanityDirective()) {
+          this.restrictLanguageMode_(SANE_MODE);
+          checkDirective = false;
         }
       }
 
@@ -442,7 +465,7 @@ export class Parser {
   }
 
   parseModuleItemList_() {
-    this.strictMode_ = true;
+    this.languageMode_ = STRICT_MODE;
     var result = [];
     var type;
 
@@ -739,7 +762,7 @@ export class Parser {
   peekId_(type) {
     if (type === IDENTIFIER)
       return true;
-    if (this.strictMode_)
+    if (this.isStrictMode_())
       return false;
     return this.peekToken_().isStrictKeyword();
   }
@@ -750,8 +773,8 @@ export class Parser {
 
   parseClassShared_(constr) {
     var start = this.getTreeStartLocation_();
-    var strictMode = this.strictMode_;
-    this.strictMode_ = true;
+    var languageMode = this.languageMode_;
+    this.restrictLanguageMode_(STRICT_MODE);
     this.eat_(CLASS);
     var name = null;
     var typeParameters = null;
@@ -772,7 +795,7 @@ export class Parser {
     this.eat_(OPEN_CURLY);
     var elements = this.parseClassElements_();
     this.eat_(CLOSE_CURLY);
-    this.strictMode_ = strictMode;
+    this.languageMode_ = languageMode;
     return new constr(this.getTreeLocation_(start), name, superClass,
                       elements, annotations, typeParameters);
   }
@@ -1085,18 +1108,18 @@ export class Parser {
 
     var allowYield = this.allowYield;
     var allowAwait = this.allowAwait;
-    var strictMode = this.strictMode_;
+    var languageMode = this.languageMode_;
 
     this.allowYield = functionKind && functionKind.type === STAR;
     this.allowAwait = functionKind &&
         functionKind.type === IDENTIFIER && functionKind.value === ASYNC;
 
-    var result = this.parseStatementList_(!strictMode);
+    var result = this.parseStatementList_(languageMode < SANE_MODE);
 
-    if (!strictMode && this.strictMode_ && params)
+    if (!languageMode && this.isStrictMode_() && params)
       StrictParams.visit(params, this.errorReporter_);
 
-    this.strictMode_ = strictMode;
+    this.languageMode_ = languageMode;
     this.allowYield = allowYield;
     this.allowAwait = allowAwait;
 
@@ -1580,7 +1603,7 @@ export class Parser {
    * @private
    */
   parseWithStatement_() {
-    if (this.strictMode_)
+    if (this.isStrictMode_())
       this.reportError_('Strict mode code may not include a with statement');
 
     var start = this.getTreeStartLocation_();
@@ -1804,7 +1827,7 @@ export class Parser {
       case PUBLIC:
       case STATIC:
       case YIELD:
-        if (!this.strictMode_)
+        if (!this.isStrictMode_())
           return this.parseIdentifierExpression_();
         this.reportReservedIdentifier_(this.nextToken_());
         // Fall through.
@@ -2104,7 +2127,7 @@ export class Parser {
 
       if (this.options_.propertyNameShorthand &&
           nameLiteral.type === IDENTIFIER ||
-          !this.strictMode_ && nameLiteral.type === YIELD) {
+          !this.isStrictMode_() && nameLiteral.type === YIELD) {
 
         if (this.peek_(EQUAL)) {
           token = this.nextToken_();
@@ -2124,7 +2147,7 @@ export class Parser {
                                          nameLiteral);
       }
 
-      if (this.strictMode_ && nameLiteral.isStrictKeyword())
+      if (this.isStrictMode_() && nameLiteral.isStrictKeyword())
         this.reportReservedIdentifier_(nameLiteral);
     }
 
@@ -2659,7 +2682,13 @@ export class Parser {
   parseEquality_(expressionIn) {
     var start = this.getTreeStartLocation_();
     var left = this.parseRelational_(expressionIn);
-    while (this.peekEqualityOperator_(this.peekType_())) {
+    var type;
+    while (this.peekEqualityOperator_(type = this.peekType_())) {
+      if (this.isSaneMode_() && (type === EQUAL_EQUAL || type === NOT_EQUAL)) {
+        this.reportError_(this.peekToken_().location,
+                          `${type} is not allowed in sane mode`);
+        break;
+      }
       var operator = this.nextToken_();
       var right = this.parseRelational_(expressionIn);
       left = this.newBinaryExpression_(start, left, operator, right);
@@ -3522,7 +3551,7 @@ export class Parser {
     }
 
     var token = name.literalToken;
-    if (this.strictMode_ && token.isStrictKeyword())
+    if (this.isStrictMode_() && token.isStrictKeyword())
       this.reportReservedIdentifier_(token);
 
     if (useBinding) {
@@ -4255,7 +4284,7 @@ export class Parser {
     }
 
     if (token.isStrictKeyword()) {
-      if (this.strictMode_) {
+      if (this.isStrictMode_()) {
         this.reportReservedIdentifier_(token);
       } else {
         // Use an identifier token instead because it is treated as such and

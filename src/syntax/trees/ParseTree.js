@@ -372,7 +372,7 @@ export class ParseTree {
     return this.getDirectivePrologueStringToken_() !== null;
   }
 
-  isUseStrictDirective() {
+  isDirective_(name) {
     var token = this.getDirectivePrologueStringToken_();
     if (!token)
       return false;
@@ -380,7 +380,16 @@ export class ParseTree {
     // A Use Strict Directive may not contain an EscapeSequence or
     // LineContinuation. For example, 'use str\x69ct' is not a valid Use Strict
     // Directive.
-    return v === '"use strict"' || v === "'use strict'";
+    return v === `"use ${name}"` || v === `'use ${name}'`;
+  }
+
+  isUseStrictDirective() {
+    return this.isDirective_('strict');
+  }
+
+  isUseSanityDirective() {
+    // TODO(arv): Rename
+    return this.isDirective_('sanity');
   }
 
   toJSON() {
