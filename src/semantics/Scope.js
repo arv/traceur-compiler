@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+'use strong';
+
 import {
   BLOCK,
   CATCH
@@ -79,7 +81,7 @@ export class Scope {
   // we deduce the oldType
   renameBinding(oldName, newTree, newType, reporter) {
     var name = newTree.getStringValue();
-    if (newType == VAR) {
+    if (newType === VAR) {
       if (this.lexicalDeclarations[oldName]) {
         delete this.lexicalDeclarations[oldName];
         this.addVar(newTree, reporter);
