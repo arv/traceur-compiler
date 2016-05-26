@@ -1,7 +1,8 @@
 'use strict';
 
 var fs = require('fs');
-var traceurAPI = require('../src/node/api.js');
+// var traceurAPI = require('../src/node/api.js');
+var Compiler = require('../dist/commonjs/Compiler.js').Compiler;
 
 var org = require.extensions['.js'];
 require.extensions['.js'] = function(module, path) {
@@ -13,11 +14,11 @@ require.extensions['.js'] = function(module, path) {
 
     // TODO(arv): Use parseProlog from src/util/parseProlog.js so that we can
     // compile when we have non default options too.
-    var compiled = traceurAPI.compile(content, {
+    var compiler = new Compiler({
       modules: 'commonjs',
       importRuntime: true,
-    }, path, path);
-
+    });
+    var compiled = compiler.compile(content, path, path);
 
     if (needsWrapper(path)) {
       var header = 'var assert = require("chai").assert, test = require("mocha").test;' + 'test("' + path + '", function(){';

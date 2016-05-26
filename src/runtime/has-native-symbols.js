@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const v = !!Object.getOwnPropertySymbols && typeof Symbol === 'function';
+const v = !!Object.getOwnPropertySymbols &&
+    typeof Symbol === 'function';
 
 export default function hasNativeSymbol() {
   return v;
